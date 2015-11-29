@@ -1,6 +1,7 @@
 from urlparse import urlparse
 from urllib import urlencode
 from urllib2 import Request, urlopen, HTTPError
+from lxml import html, cssselect
 
 
 class Grabber:
@@ -59,3 +60,22 @@ class Grabber:
             except HTTPError as e:
                 # TODO: raise error
                 pass
+
+    def grab_audio_items(self):
+        """Parses the raw HTML for downloadable audio files.
+        @return an array of all audio items w/ artist, album, title, and url info
+        """
+        response = self.raw_grab()
+        result = []
+
+        sel = cssselect.CSSSelector('[audio-preview-url]')
+        content = html.fromstring(response.read())
+        for e in sel(content):
+            result.append({
+                'artist': e.get('preview-artist'),
+                'album': e.get('preview-album'),
+                'title': e.get('preview-title'),
+                'url': e.get('audio-preview-url')
+            })
+
+        return result
