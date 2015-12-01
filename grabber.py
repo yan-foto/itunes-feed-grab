@@ -104,6 +104,10 @@ class Grabber:
             linkable_link = etree.SubElement(linkable, 'link')
             linkable_link.text = self.url
 
+        for date in ['pubDate', 'lastBuildDate']:
+            date_field = etree.SubElement(channel, date)
+            date_field.text = formatdate(mktime(datetime.now().timetuple()))
+
         # iTunes specific items
         etree.SubElement(channel, '{%s}image' % ns, href=meta['image'])
         itunes_author = etree.SubElement(channel, '{%s}author' % ns)
