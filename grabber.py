@@ -146,9 +146,9 @@ class Grabber:
             h, m = divmod(m, 60)
             itunes_duration = etree.SubElement(item_el, '{%s}duration' % ns)
             if h > 0:
-                itunes_duration.text = '{}:{}:{}'.format(h, m, s)
+                itunes_duration.text = '{:02d}:{:02d}:{:02d}'.format(h, m, s)
             else:
-                itunes_duration.text = '{}:{}'.format(m, s)
+                itunes_duration.text = '{:02d}:{:02d}'.format(m, s)
 
             # TODO: Figure out length :/
             enc = etree.SubElement(
