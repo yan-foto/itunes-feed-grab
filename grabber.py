@@ -5,6 +5,7 @@ from lxml import html, cssselect, etree
 from time import mktime
 from datetime import datetime
 from email.Utils import formatdate
+import re
 
 
 class Grabber:
@@ -150,11 +151,13 @@ class Grabber:
             else:
                 itunes_duration.text = '{:02d}:{:02d}'.format(m, s)
 
+            # Enclosure: url must have http scheme and not https!
             # TODO: Figure out length :/
+            url = re.sub(r'^https://', 'http://', item['url'])
             enc = etree.SubElement(
                 item_el,
                 'enclosure',
-                url=item['url'],
+                url=url,
                 type='audio/mpeg',
                 length="0")
 
