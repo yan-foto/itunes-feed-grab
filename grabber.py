@@ -2,6 +2,9 @@ from urlparse import urlparse
 from urllib import urlencode
 from urllib2 import Request, urlopen, HTTPError
 from lxml import html, cssselect, etree
+from time import mktime
+from datetime import datetime
+from email.Utils import formatdate
 
 
 class Grabber:
@@ -110,18 +113,38 @@ class Grabber:
         for item in self._audio_items_from(content):
             item_el = etree.SubElement(channel, 'item')
 
-            for key in ['title']:
-                sub_item = etree.SubElement(item_el, key)
-                sub_item.text = item[key]
+            # Title
+            sub_item = etree.SubElement(item_el, 'title')
+            sub_item.text = item['name']
+
+            # Description
+            sub_item = etree.SubElement(item_el, 'description')
+            sub_item.text = etree.CDATA(item['description'])
 
             # 'link' and 'guid' both as URL
             for key in ['link', 'guid']:
                 sub_item = etree.SubElement(item_el, key)
                 sub_item.text = item['url']
 
+            # Publication date
+            # TODO: this looks really messy!
+            dt = datetime.strptime(item['release-date'], '%Y/%m/%d')
+            sub_item = etree.SubElement(item_el, 'pubDate')
+            sub_item.text = formatdate(mktime(dt.timetuple()))
+
             # iTunes specific tags
             itunes_author = etree.SubElement(item_el, '{%s}author' % ns)
             itunes_author.text = meta['author']
+
+            # Duration is provided in miliseconds
+            duration = int(item['time']) / 1000
+            m, s = divmod(duration, 60)
+            h, m = divmod(m, 60)
+            itunes_duration = etree.SubElement(item_el, '{%s}duration' % ns)
+            if h > 0:
+                itunes_duration.text = '{}:{}:{}'.format(h, m, s)
+            else:
+                itunes_duration.text = '{}:{}'.format(m, s)
 
             # TODO: Figure out length :/
             enc = etree.SubElement(
@@ -144,16 +167,19 @@ class Grabber:
     def _audio_items_from(self, content):
         """@return an array of audio items from given podcast page (HTML content)"""
         result = []
-        sel = cssselect.CSSSelector('[audio-preview-url]')
+        sel = cssselect.CSSSelector('table.tracklist-table > tbody tr')
 
+        columns = 'index,name,time,release-date,description,popularity,price'.split(
+            ',')
         for e in sel(content):
-            result.append({
-                'artist': e.get('preview-artist'),
-                'album': e.get('preview-album'),
-                'title': e.get('preview-title'),
-                'url': e.get('audio-preview-url'),
-                'duration': e.get('preview-duration')
-            })
+            track = {}
+
+            for i in range(0, len(columns)):
+                col = columns[i]
+                track[col] = e.find('.//td[%d]' % (i + 1)).get('sort-value')
+            track["url"] = e.get('audio-preview-url')
+
+            result.append(track)
 
         return result
 
