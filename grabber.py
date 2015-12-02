@@ -1,7 +1,7 @@
 from urlparse import urlparse
 from urllib import urlencode
 from urllib2 import Request, urlopen, HTTPError
-from lxml import html, cssselect, etree
+from lxml import html, etree
 from time import mktime
 from datetime import datetime
 from email.Utils import formatdate
@@ -174,11 +174,12 @@ class Grabber:
     def _audio_items_from(self, content):
         """@return an array of audio items from given podcast page (HTML content)"""
         result = []
-        sel = cssselect.CSSSelector('table.tracklist-table > tbody tr')
 
+        rows = content.xpath(
+            "//table[contains(@class, 'tracklist-table')]/tbody//tr")
         columns = 'index,name,time,release-date,description,popularity,price'.split(
             ',')
-        for e in sel(content):
+        for e in rows:
             track = {}
 
             for i in range(0, len(columns)):
@@ -194,21 +195,20 @@ class Grabber:
         """Parses podcasts meta information out of given HTML content.
         @return dictionary containing title, author, description, and image"""
         result = {}
+        product_info = content.find(".//div[@class='product-info']")
         # Title
-        sel = cssselect.CSSSelector('.product-info .title h1 a')
-        result["title"] = sel(content)[0].text
+        result["title"] = product_info.find(".//div[@class='title']/h1/a").text
 
         # Author
-        sel = cssselect.CSSSelector('.product-info .byline h2')
-        result["author"] = sel(content)[0].text
+        result["author"] = product_info.find(".//div[@class='byline']/h2").text
 
         # Description
-        sel = cssselect.CSSSelector('.product-info .product-review p')
-        result["description"] = sel(content)[0].text
+        result["description"] = product_info.find(
+            ".//div[@class='product-review']/p").text
 
         # Image
-        sel = cssselect.CSSSelector('.product .artwork img')
-        result["image"] = sel(content)[0].get('src-swap')
+        image = content.find(".//div[@class='artwork']/img")
+        result["image"] = image.get('src-swap')
 
         # URL (original URL provided to Grabber)
         result["url"] = self.url
