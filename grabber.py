@@ -5,6 +5,7 @@ from lxml import html, etree
 from time import mktime
 from datetime import datetime
 from email.Utils import formatdate
+from grabexceptions import *
 import re
 
 
@@ -30,11 +31,22 @@ class Grabber:
     # iTunes' XML DTD
     ITUNES_XML_DTD = 'http://www.itunes.com/dtds/podcast-1.0.dtd'
 
-    def __init__(self, url):
+    def __init__(self, url_or_id):
         """Initializes.
-        @param url desired iTunes URL
+        @param url_or_id: URL or ID of iTunes podcast
         """
-        self.url = url
+        if isinstance(url_or_id, (int, long)):
+            self.id = url_or_id
+        elif isinstance(url_or_id, str):
+            id = re.search('id=?(\d+)', url_or_id)
+            if id is None:
+                raise InvalidTarget("Couldn't find ID of requested item")
+            self.id = id.group(1) if id else query['id']
+        else:
+            raise InvalidTarget(
+                "Target must be an ID (number) or string (URL)!")
+
+        self.url = "{}?{}".format(Grabber.POD_HOST, urlencode({'id': self.id}))
 
     def raw_grab(self):
         """Returns the content of given URL as if it was opened in iTunes.
@@ -49,24 +61,14 @@ class Grabber:
             return False
 
         # Follow the redirects to get to actual page with links
-        succeeded = False
-        while not succeeded:
-            try:
-                request = Request(url, None, Grabber.HEADERS)
-                response = urlopen(request)
+        try:
+            request = Request(url, None, Grabber.HEADERS)
+            print(url)
+            return urlopen(request)
 
-                # If we are pointed to a new page
-                wo_path = response.info().getheader("x-apple-translated-wo-url")
-                if wo_path is not None:
-                    wo_query = dict(map(lambda item: item.split(
-                        '='), urlparse(wo_path).query.split('&')))
-                    url = "{}?{}".format(Grabber.POD_HOST, urlencode(wo_query))
-                    continue
-
-                return response
-            except HTTPError as e:
-                # TODO: raise error
-                pass
+        except HTTPError as e:
+            # TODO: raise error
+            pass
 
     def grab_audio_items(self):
         """@return an array of all audio items w/ artist, album, title, and url info"""
