@@ -37,14 +37,15 @@ class Grabber:
         """
         if isinstance(url_or_id, (int, long)):
             self.id = url_or_id
-        elif isinstance(url_or_id, str):
+        elif isinstance(url_or_id, (str, unicode)):
             id = re.search('id=?(\d+)', url_or_id)
             if id is None:
                 raise InvalidTarget("Couldn't find ID of requested item")
             self.id = id.group(1) if id else query['id']
         else:
             raise InvalidTarget(
-                "Target must be an ID (number) or string (URL)!")
+                "Target must be an ID (number) or string (URL)! (given: {})".format(
+                    type(url_or_id)))
 
         self.url = "{}?{}".format(Grabber.POD_HOST, urlencode({'id': self.id}))
 
