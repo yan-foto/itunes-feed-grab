@@ -63,7 +63,6 @@ class Grabber:
         # Follow the redirects to get to actual page with links
         try:
             request = Request(url, None, Grabber.HEADERS)
-            print(url)
             return urlopen(request)
 
         except HTTPError as e:
@@ -143,15 +142,22 @@ class Grabber:
             itunes_author = etree.SubElement(item_el, '{%s}author' % ns)
             itunes_author.text = meta['author']
 
-            # Duration is provided in miliseconds
-            duration = int(item['time']) / 1000
-            m, s = divmod(duration, 60)
-            h, m = divmod(m, 60)
-            itunes_duration = etree.SubElement(item_el, '{%s}duration' % ns)
-            if h > 0:
-                itunes_duration.text = '{:02d}:{:02d}:{:02d}'.format(h, m, s)
-            else:
-                itunes_duration.text = '{:02d}:{:02d}'.format(m, s)
+            # If duration is provided
+            try:
+                # Duration is provided in miliseconds
+                duration = int(item['time']) / 1000
+                m, s = divmod(duration, 60)
+                h, m = divmod(m, 60)
+                itunes_duration = etree.SubElement(
+                    item_el, '{%s}duration' % ns)
+                if h > 0:
+                    itunes_duration.text = '{:02d}:{:02d}:{:02d}'.format(
+                        h, m, s)
+                else:
+                    itunes_duration.text = '{:02d}:{:02d}'.format(m, s)
+            except ValueError:
+                # No duration provided
+                pass
 
             # Enclosure: url must have http scheme and not https!
             # TODO: Figure out length :/
@@ -187,7 +193,12 @@ class Grabber:
             for i in range(0, len(columns)):
                 col = columns[i]
                 track[col] = e.find('.//td[%d]' % (i + 1)).get('sort-value')
-            track["url"] = e.get('audio-preview-url')
+            audio_url = e.get('audio-preview-url')
+            if audio_url is None:
+                # TODO: append also video links!
+                continue
+
+            track["url"] = audio_url
 
             result.append(track)
 
@@ -197,14 +208,15 @@ class Grabber:
         """Parses podcasts meta information out of given HTML content.
         @return dictionary containing title, author, description, and image"""
         result = {}
-        product_info = content.find(".//div[@class='product-info']")
-        # Title
-        result["title"] = product_info.find(".//div[@class='title']/h1/a").text
 
-        # Author
-        result["author"] = product_info.find(".//div[@class='byline']/h2").text
+        # Title and Author
+        result["title"] = content.find(
+            ".//button[@podcast-name]").get('podcast-name')
+        result["author"] = content.find(
+            ".//button[@artist-name]").get('artist-name')
 
         # Description
+        product_info = content.find(".//div[@class='product-info']")
         result["description"] = product_info.find(
             ".//div[@class='product-review']/p").text
 
