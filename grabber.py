@@ -28,7 +28,7 @@ from grabexceptions import *
 import re
 
 __author__ = "Yan Foto"
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 
 class Grabber:
@@ -190,7 +190,7 @@ class Grabber:
                 'enclosure',
                 url=url,
                 type='audio/mpeg',
-                length="0")
+                length=item['size'])
 
         return etree.tostring(
             root,
@@ -221,7 +221,13 @@ class Grabber:
                 # TODO: append also video links!
                 continue
 
-            track["url"] = audio_url
+            track['url'] = audio_url
+
+            # Fetch size in octets using a HEAD request
+            request = Request(audio_url, None, Grabber.HEADERS)
+            request.get_method = lambda: 'HEAD'
+            response = urlopen(request)
+            track['size'] = response.headers['content-length']
 
             result.append(track)
 
