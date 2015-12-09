@@ -27,6 +27,9 @@ from email.Utils import formatdate
 from grabexceptions import *
 import re
 
+__author__ = "Yan Foto"
+__version__ = "0.1.0"
+
 
 class Grabber:
     """Given an iTunes URL, grabber provides various methods to fetch contents
