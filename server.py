@@ -21,6 +21,7 @@ import webapp2
 import json
 from grabber import Grabber
 from grabexceptions import InvalidTarget
+from google.appengine.api import urlfetch
 
 
 class RssGenerator(webapp2.RequestHandler):
@@ -36,6 +37,8 @@ class RssGenerator(webapp2.RequestHandler):
             except ValueError:
                 pass
 
+            # This is required so that fetch requests doesn't time out!
+            urlfetch.set_default_fetch_deadline(60)
             g = Grabber(target)
             self.response.headers[
                 'Content-Type'] = 'application/rss+xml; charset=utf-8'
