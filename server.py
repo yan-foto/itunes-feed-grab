@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import webapp2
 import json
 from grabber import Grabber
+from grabexceptions import InvalidTarget
 
 
 class RssGenerator(webapp2.RequestHandler):
@@ -28,6 +29,13 @@ class RssGenerator(webapp2.RequestHandler):
         try:
             # target = json.loads(self.request.body)["target"]
             target = self.request.GET['target']
+
+            # if target is a number its an ID!
+            try:
+                target = long(target)
+            except ValueError:
+                pass
+
             g = Grabber(target)
             self.response.headers[
                 'Content-Type'] = 'application/rss+xml; charset=utf-8'
@@ -36,6 +44,8 @@ class RssGenerator(webapp2.RequestHandler):
             self.response.status = '400 malformed request body'
         except KeyError:
             self.response.status = '400 no target url specified'
+        except InvalidTarget:
+            self.response.status = '400 Could not find ID'
 
 
 app = webapp2.WSGIApplication([

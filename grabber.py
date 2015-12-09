@@ -28,7 +28,7 @@ from grabexceptions import *
 import re
 
 __author__ = "Yan Foto"
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 
 class Grabber:
