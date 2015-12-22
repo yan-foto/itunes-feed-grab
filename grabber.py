@@ -48,7 +48,10 @@ class Grabber:
     ]
 
     # Podcast hosts for web objects
-    POD_HOST = 'https://itunes.apple.com/WebObjects/DZR.woa/wa/viewPodcast'
+    # We used to use 'https://itunes.apple.com/WebObjects/DZR.woa/wa/viewPodcast'
+    # URL, but it didn't support some of older podcasts ('Not available in market'
+    # error), so we use this one and instead look for possible redirects
+    POD_HOST = 'https://itunes.apple.com/WebObjects/MZStore.woa/wa/viewPodcast'
 
     # iTunes' XML DTD
     ITUNES_XML_DTD = 'http://www.itunes.com/dtds/podcast-1.0.dtd'
@@ -75,22 +78,28 @@ class Grabber:
         """Returns the content of given URL as if it was opened in iTunes.
         @return response object if grabbing succeeds
         """
-        url = self.url
-
         # Check if it is an itunes URL
-        urlInfo = urlparse(url)
+        urlInfo = urlparse(self.url)
         if urlInfo.netloc not in Grabber.WHITE_ADDRS:
             # TODO: raise error
             return False
 
         # Follow the redirects to get to actual page with links
-        try:
-            request = Request(url, None, Grabber.HEADERS)
-            return urlopen(request)
-
-        except HTTPError as e:
-            # TODO: raise error
-            pass
+        finished = False
+        while not finished:
+            try:
+                request = Request(self.url, None, Grabber.HEADERS)
+                response = urlopen(request)
+                content = response.read()
+                redirect_url = self._redirect_url(content)
+                if redirect_url is None:
+                    finished = True
+                    return content
+                else:
+                    self.url = redirect_url
+            except HTTPError as e:
+                # TODO: raise error
+                pass
 
     def grab_audio_items(self):
         """@return an array of all audio items w/ artist, album, title, and url info"""
@@ -198,9 +207,26 @@ class Grabber:
             encoding='utf-8',
             pretty_print=True)
 
+    def _redirect_url(self, response):
+        """Checks if server response denotes a redirection.
+        @param response: response from server in string
+        @return redirect URL or None if response is already valid
+        """
+        try:
+            root = etree.fromstring(response)
+            candidates = root.xpath(
+                './/key[text()="url"]/following-sibling::string')
+
+            if len(candidates) > 0:
+                return candidates[0].text
+
+        except etree.XMLSyntaxError:
+            # Response is HTML and not XML: we're good to parse further
+            pass
+
     def _as_html(self):
         """@return lxml.html object of object's URL"""
-        return html.fromstring(self.raw_grab().read())
+        return html.fromstring(self.raw_grab())
 
     def _audio_items_from(self, content):
         """@return an array of audio items from given podcast page (HTML content)"""
@@ -246,8 +272,8 @@ class Grabber:
 
         # Description
         product_info = content.find(".//div[@class='product-info']")
-        result["description"] = product_info.find(
-            ".//div[@class='product-review']/p").text
+        result["description"] = product_info.xpath(
+            ".//div[contains(@class, 'product-review')]/p")[0].text
 
         # Image
         image = content.find(".//div[@class='artwork']/img")
