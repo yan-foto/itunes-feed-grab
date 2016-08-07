@@ -28,7 +28,7 @@ from grabexceptions import *
 import re
 
 __author__ = "Yan Foto"
-__version__ = "0.2.1"
+__version__ = "0.3.0"
 
 
 class Grabber:
@@ -53,10 +53,14 @@ class Grabber:
     # error), so we use this one and instead look for possible redirects
     POD_HOST = 'https://itunes.apple.com/WebObjects/MZStore.woa/wa/viewPodcast'
 
+    # Host for courses as they are not enlisted as podcasts and trying to fetch
+    # them as podcasts returns the usual and misleading 'Not available ...' error
+    COURSE_HOST = 'https://itunes.apple.com/course'
+
     # iTunes' XML DTD
     ITUNES_XML_DTD = 'http://www.itunes.com/dtds/podcast-1.0.dtd'
 
-    def __init__(self, url_or_id):
+    def __init__(self, url_or_id, course = False):
         """Initializes.
         @param url_or_id: URL or ID of iTunes podcast
         """
@@ -72,7 +76,11 @@ class Grabber:
                 "Target must be an ID (number) or string (URL)! (given: {})".format(
                     type(url_or_id)))
 
-        self.url = "{}?{}".format(Grabber.POD_HOST, urlencode({'id': self.id}))
+        self.course = course
+        if course:
+            self.url = "{}/id{}".format(Grabber.COURSE_HOST, self.id)
+        else:
+            self.url = "{}?{}".format(Grabber.POD_HOST, urlencode({'id': self.id}))
 
     def raw_grab(self):
         """Returns the content of given URL as if it was opened in iTunes.
@@ -91,6 +99,7 @@ class Grabber:
                 request = Request(self.url, None, Grabber.HEADERS)
                 response = urlopen(request)
                 content = response.read()
+                response.close()
                 redirect_url = self._redirect_url(content)
                 if redirect_url is None:
                     finished = True
@@ -166,7 +175,11 @@ class Grabber:
 
             # Publication date
             # TODO: this looks really messy!
-            dt = datetime.strptime(item['release-date'], '%Y/%m/%d')
+            # If no release-date is given (e.g. courses) use now!
+            if 'release-date' in item:
+                dt = datetime.strptime(item['release-date'], '%Y/%m/%d')
+            else:
+                dt = datetime.now()
             sub_item = etree.SubElement(item_el, 'pubDate')
             sub_item.text = formatdate(mktime(dt.timetuple()))
 
@@ -234,8 +247,11 @@ class Grabber:
 
         rows = content.xpath(
             "//table[contains(@class, 'tracklist-table')]/tbody//tr")
-        columns = 'index,name,time,release-date,description,popularity,price'.split(
-            ',')
+        if self.course:
+            columns = 'index,name,description,time,price'
+        else:
+            columns = 'index,name,time,release-date,description,popularity,price'
+        columns = columns.split(',')
         for e in rows:
             track = {}
 
@@ -271,9 +287,11 @@ class Grabber:
             ".//button[@artist-name]").get('artist-name')
 
         # Description
+        # TODO: this is not working for courses
         product_info = content.find(".//div[@class='product-info']")
-        result["description"] = product_info.xpath(
-            ".//div[contains(@class, 'product-review')]/p")[0].text
+        description = product_info.xpath(
+            ".//div[contains(@class, 'product-review')]/p")
+        result["description"] = description[0].text if description else ''
 
         # Image
         image = content.find(".//div[@class='artwork']/img")

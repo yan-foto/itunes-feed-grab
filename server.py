@@ -30,6 +30,7 @@ class RssGenerator(webapp2.RequestHandler):
         try:
             # target = json.loads(self.request.body)["target"]
             target = self.request.GET['target']
+            isCourse = 'course' in self.request.GET
 
             # if target is a number its an ID!
             try:
@@ -39,7 +40,7 @@ class RssGenerator(webapp2.RequestHandler):
 
             # This is required so that fetch requests doesn't time out!
             urlfetch.set_default_fetch_deadline(60)
-            g = Grabber(target)
+            g = Grabber(target, isCourse)
             self.response.headers[
                 'Content-Type'] = 'application/rss+xml; charset=utf-8'
             self.response.write(g.grab_rss_feed())
